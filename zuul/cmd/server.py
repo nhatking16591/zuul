@@ -69,6 +69,11 @@ class Server(zuul.cmd.ZuulApp):
             self.log.exception("Reconfiguration failed:")
         signal.signal(signal.SIGHUP, self.reconfigure_handler)
 
+    def pause_handler(self, signum, frame):
+        signal.signal(signal.SIGUSR2, signal.SIG_IGN)
+        self.log.info("Preparing to exit: putting incoming events on hold")
+        self.sched.pause()
+
     def exit_handler(self, signum, frame):
         signal.signal(signal.SIGUSR1, signal.SIG_IGN)
         self.sched.exit()
@@ -158,6 +163,7 @@ class Server(zuul.cmd.ZuulApp):
         self.early_signals = []
         signal.signal(signal.SIGHUP, self.early_handler)
         signal.signal(signal.SIGUSR1, self.early_handler)
+        signal.signal(signal.SIGUSR2, self.early_handler)
         signal.signal(signal.SIGTERM, self.early_handler)
 
         # See comment at top of file about zuul imports
@@ -220,6 +226,7 @@ class Server(zuul.cmd.ZuulApp):
 
         signal.signal(signal.SIGHUP, self.reconfigure_handler)
         signal.signal(signal.SIGUSR1, self.exit_handler)
+        signal.signal(signal.SIGUSR2, self.pause_handler)
         signal.signal(signal.SIGTERM, self.term_handler)
 
         for signum, frame in self.early_signals:
@@ -227,6 +234,8 @@ class Server(zuul.cmd.ZuulApp):
                 self.reconfigure_handler(signum, frame)
             elif signum == signal.SIGUSR1:
                 self.exit_handler(signum, frame)
+            elif signum == signal.SIGUSR2:
+                self.pause_handler(signum, frame)
             elif signum == signal.SIGTERM:
                 self.term_handler(signum, frame)
         del self.early_signals
