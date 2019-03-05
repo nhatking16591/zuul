@@ -1714,7 +1714,7 @@ class ZuulTestCase(BaseTestCase):
         self.log.debug("Waiting until settled...")
         start = time.time()
         while True:
-            if time.time() - start > 10:
+            if time.time() - start > 20:
                 self.log.debug("Queue status:")
                 for queue in self.event_queues:
                     self.log.debug("  %s: %s" % (queue, queue.empty()))
