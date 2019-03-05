@@ -788,6 +788,10 @@ class Scheduler(threading.Thread):
         event.wait()
         self.log.debug("Enqueue complete")
 
+    def pause(self):
+        self.log.debug("Pause: stop processing new events")
+        self._pause = True
+
     def exit(self):
         self.log.debug("Prepare to exit")
         self._pause = True
@@ -853,11 +857,10 @@ class Scheduler(threading.Thread):
         self.log.debug("Resuming queue processing")
         self.wake_event.set()
 
-    def _doPauseEvent(self):
-        if self._exit:
-            self.log.debug("Exiting")
-            self._save_queue()
-            os._exit(0)
+    def _doExitEvent(self):
+        self.log.debug("Exiting")
+        self._save_queue()
+        os._exit(0)
 
     def _doReconfigureEvent(self, event):
         # This is called in the scheduler loop after another thread submits
@@ -1038,8 +1041,8 @@ class Scheduler(threading.Thread):
                     while not self.trigger_event_queue.empty():
                         self.process_event_queue()
 
-                if self._pause and self._areAllBuildsComplete():
-                    self._doPauseEvent()
+                if self._pause and self._exit and self._areAllBuildsComplete():
+                    self._doExitEvent()
 
                 for pipeline in self.layout.pipelines.values():
                     while pipeline.manager.processQueue():
