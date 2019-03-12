@@ -250,27 +250,26 @@ class Pipeline(object):
         elif build.result != 'SUCCESS':
             # Get a JobTree from a Job so we can find only its dependent jobs
             root = self.getJobTree(item.change.project)
-            tree = root.getJobTreeForJob(build.job)
-            for job in tree.getJobs():
-                fakebuild = Build(job, None)
-                fakebuild.result = 'SKIPPED'
-                item.addBuild(fakebuild)
+            dep_jobs = root.getDependentJobs(build.job)
+            self.skipJobs(item, dep_jobs)
 
     def setUnableToMerge(self, item):
         item.current_build_set.unable_to_merge = True
         root = self.getJobTree(item.change.project)
-        for job in root.getJobs():
-            fakebuild = Build(job, None)
-            fakebuild.result = 'SKIPPED'
-            item.addBuild(fakebuild)
+        self.skipJobs(item, root.getJobs())
 
     def setDequeuedNeedingChange(self, item):
         item.dequeued_needing_change = True
         root = self.getJobTree(item.change.project)
-        for job in root.getJobs():
-            fakebuild = Build(job, None)
-            fakebuild.result = 'SKIPPED'
-            item.addBuild(fakebuild)
+        self.skipJobs(item, root.getJobs())
+
+    def skipJobs(self, item, jobs):
+        for job in jobs:
+            # No need to add SKIPPED status for already added jobs
+            if not item.current_build_set.getBuild(job.name):
+                fakebuild = Build(job, None)
+                fakebuild.result = 'SKIPPED'
+                item.addBuild(fakebuild)
 
     def getChangesInQueue(self):
         changes = []
@@ -345,7 +344,7 @@ class ChangeQueue(object):
     def addProject(self, project):
         if project not in self.projects:
             self.projects.append(project)
-            self._jobs |= set(self.pipeline.getJobTree(project).getJobs())
+            self._jobs |= self.pipeline.getJobTree(project).getJobs()
 
             names = [x.name for x in self.projects]
             names.sort()
@@ -485,6 +484,9 @@ class Job(object):
     def __repr__(self):
         return '<Job %s>' % (self.name)
 
+    def __hash__(self):
+        return hash(self.name)
+
     @property
     def is_metajob(self):
         return self.name.startswith('^')
@@ -558,19 +560,24 @@ class JobTree(object):
         self.job_trees = []
 
     def addJob(self, job):
-        if job not in [x.job for x in self.job_trees]:
-            t = JobTree(job)
-            self.job_trees.append(t)
-            return t
-        for tree in self.job_trees:
-            if tree.job == job:
-                return tree
+        t = JobTree(job)
+        self.job_trees.append(t)
+        return t
 
     def getJobs(self):
-        jobs = []
+        jobs = set()
         for x in self.job_trees:
-            jobs.append(x.job)
-            jobs.extend(x.getJobs())
+            jobs.add(x.job)
+            jobs.update(x.getJobs())
+        return jobs
+
+    def getDependentJobs(self, job):
+        jobs = set()
+        if job == self.job:
+            jobs = self.getJobs()
+        else:
+            for x in self.job_trees:
+                jobs.update(x.getDependentJobs(job))
         return jobs
 
     def getJobTreeForJob(self, job):
