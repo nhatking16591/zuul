@@ -2328,6 +2328,10 @@ jobs:
                         self.assertEqual(change['id'], '1,1')
                         for job in change['jobs']:
                             status_jobs.append(job)
+
+        # Do not depend on arbitrary job order in status JSON
+        status_jobs.sort(key=lambda x: x['name'])
+
         self.assertEqual('project-merge', status_jobs[0]['name'])
         self.assertEqual('https://server/job/project-merge/0/',
                          status_jobs[0]['url'])
@@ -3517,25 +3521,27 @@ jobs:
 
         self.assertEqual(2, len(self.smtp_messages))
 
-        failure_body = """\
-Build failed.  For information on how to proceed, see \
-http://wiki.example.org/Test_Failures
+        failure_body_lines = {
+            "Build failed.  For information on how to proceed, \
+see http://wiki.example.org/Test_Failures",
+            "- test1 http://logs.example.com/1/1/gate/test1/0 : FAILURE in 0s",
+            "- test2 http://logs.example.com/1/1/gate/test2/1 : SUCCESS in 0s",
+            "For CI problems and help debugging, contact ci@example.org",
+            ""
+        }
 
-- test1 http://logs.example.com/1/1/gate/test1/0 : FAILURE in 0s
-- test2 http://logs.example.com/1/1/gate/test2/1 : SUCCESS in 0s
+        success_body_lines = {
+            "Build succeeded.",
+            "- test1 http://logs.example.com/2/1/gate/test1/2 : SUCCESS in 0s",
+            "- test2 http://logs.example.com/2/1/gate/test2/3 : SUCCESS in 0s",
+            "For CI problems and help debugging, contact ci@example.org",
+            ""
+        }
 
-For CI problems and help debugging, contact ci@example.org"""
-
-        success_body = """\
-Build succeeded.
-
-- test1 http://logs.example.com/2/1/gate/test1/2 : SUCCESS in 0s
-- test2 http://logs.example.com/2/1/gate/test2/3 : SUCCESS in 0s
-
-For CI problems and help debugging, contact ci@example.org"""
-
-        self.assertEqual(failure_body, self.smtp_messages[0]['body'])
-        self.assertEqual(success_body, self.smtp_messages[1]['body'])
+        self.assertEqual(failure_body_lines,
+                         set(self.smtp_messages[0]['body'].splitlines()))
+        self.assertEqual(success_body_lines,
+                         set(self.smtp_messages[1]['body'].splitlines()))
 
     def test_merge_failure_reporters(self):
         """Check that the config is set up correctly"""
@@ -4500,10 +4506,10 @@ For CI problems and help debugging, contact ci@example.org"""
         self.assertIn(
             '- docs-draft-test http://docs-draft.example.org/1/1/1/check/'
             'docs-draft-test/%s/publish-docs/' % uuid,
-            body[2])
+            body[2] + body[3])
         self.assertIn(
             '- docs-draft-test2 https://server/job/docs-draft-test2/1/',
-            body[3])
+            body[2] + body[3])
 
     def test_layout_abort_pipelines(self):
         "Test if defining abort-pipelines for pipelines with "
