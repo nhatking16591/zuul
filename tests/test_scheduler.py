@@ -4519,3 +4519,65 @@ see http://wiki.example.org/Test_Failures",
         self.assertRaises(Exception, "Aborted pipeline has manager other"
                                      "than IndependentPipelineManager",
                           self.sched.reconfigure, self.config)
+
+    def test_multiple_deps_success(self):
+
+        self.worker.hold_jobs_in_build = True
+
+        A = self.fake_gerrit.addFakeChange('org/multiple-deps-project',
+                                           'master', 'A')
+
+        self.fake_gerrit.addEvent(A.getPatchsetCreatedEvent(1))
+        self.waitUntilSettled()
+
+        # 2 jobs launched simultaneously
+        running_jobs = [j.name for j in self.builds]
+        self.assertEqual(sorted(running_jobs),
+                         sorted(['project-test1', 'project-test2']))
+
+        self.worker.hold_jobs_in_build = False
+        self.worker.release()
+        self.waitUntilSettled()
+
+        self.assertEqual(len(self.history), 3)
+        self.assertEqual(self.getJobFromHistory('project-test1').result,
+                         'SUCCESS')
+        self.assertEqual(self.getJobFromHistory('project-test2').result,
+                         'SUCCESS')
+        self.assertEqual(self.getJobFromHistory('project-test3').result,
+                         'SUCCESS')
+
+    def test_multiple_deps_failure1(self):
+
+        A = self.fake_gerrit.addFakeChange('org/multiple-deps-project',
+                                           'master', 'A')
+        self.worker.addFailTest('project-test1', A)
+
+        self.fake_gerrit.addEvent(A.getPatchsetCreatedEvent(1))
+
+        self.waitUntilSettled()
+
+        self.assertEqual(len(self.history), 2)
+        self.assertEqual(self.getJobFromHistory('project-test1').result,
+                         'FAILURE')
+        self.assertEqual(self.getJobFromHistory('project-test2').result,
+                         'SUCCESS')
+
+    def test_multiple_deps_failure2(self):
+
+        A = self.fake_gerrit.addFakeChange('org/multiple-deps-project',
+                                           'master', 'A')
+        self.worker.addFailTest('project-test3', A)
+
+        self.fake_gerrit.addEvent(A.getPatchsetCreatedEvent(1))
+
+        self.waitUntilSettled()
+
+        self.assertEqual(len(self.history), 3)
+
+        self.assertEqual(self.getJobFromHistory('project-test1').result,
+                         'SUCCESS')
+        self.assertEqual(self.getJobFromHistory('project-test2').result,
+                         'SUCCESS')
+        self.assertEqual(self.getJobFromHistory('project-test3').result,
+                         'FAILURE')

@@ -259,3 +259,11 @@ projects:
   - name: org/no-jobs-project
     check:
       - project-testfile
+
+  - name: org/multiple-deps-project
+    check:
+      - ? !jobset
+        - project-test1
+        - project-test2
+        :
+          - project-test3
