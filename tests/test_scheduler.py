@@ -617,7 +617,7 @@ jobs:
         all-files-match-any:
           - ^filename2$
     """.strip()
-        data = yaml.load(job_yaml)
+        data = yaml.safe_load(job_yaml)
         config_job = data.get('jobs')[0]
         cm = zuul.change_matcher
         expected = cm.MatchAny([

@@ -411,7 +411,7 @@ class Scheduler(threading.Thread):
                 raise Exception("Unable to read layout config file at %s" %
                                 config_path)
         with open(config_path) as config_file:
-            data = yaml.load(config_file)
+            data = yaml.safe_load(config_file)
 
         validator = layoutvalidator.LayoutValidator()
         validator.validate(data, connections)
