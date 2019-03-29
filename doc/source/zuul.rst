@@ -952,6 +952,41 @@ return ``SUCCESS`` immediately.  This can be useful if you require
 that all changes be processed by a pipeline but a project has no jobs
 that can be run on it.
 
+
+Job sets
+********
+
+Properly defining multiple-dependency jobs (jobs which depend on execution of
+multiple previous jobs) is impossible in a plain tree structure. Job sets are
+the solution for this use case. A job set consists of multiple jobs and behaves
+like a single node in the job tree (much like a single job). When a job set is
+executed, all jobs in that job set are launched simultaneously. Jobs depending
+on a job set are executed only if all jobs in the job set finished successfully.
+Example::
+
+  - name: example/project
+    check:
+      - project-merge-compliance:
+        - !jobset [project-test1, project-test2, project-test3]:
+          - project-extensive-test
+
+A multi-line way to define job set::
+
+  - name: example/project
+    check:
+      - project-merge-compliance:
+        - ? !jobset
+          - project-test1
+          - project-test2
+          - project-test3
+          :
+            - project-extensive-test
+
+In this case, a quick merge compliance job is launched first. Then 3 parallel
+testing jobs are launched simultaneously. Only after all 3 jobs succeed, an
+extensive testing job is launched.
+
+
 .. seealso:: The OpenStack Zuul configuration for a comprehensive example: https://git.openstack.org/cgit/openstack-infra/project-config/tree/zuul/layout.yaml
 
 Project Templates

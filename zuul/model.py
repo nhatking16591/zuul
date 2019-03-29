@@ -157,24 +157,26 @@ class Pipeline(object):
             if self.isHoldingFollowingChanges(item.item_ahead):
                 return []
         for tree in job_trees:
-            job = tree.job
-            result = None
-            if job:
-                if not job.changeMatches(item.change):
-                    continue
-                build = item.current_build_set.getBuild(job.name)
-                if build:
-                    result = build.result
-                else:
-                    # There is no build for the root of this job tree,
-                    # so we should run it.
-                    if mutex.acquire(item, job):
-                        # If this job needs a mutex, either acquire it or make
-                        # sure that we have it before running the job.
-                        torun.append(job)
+            allSucceeded = True
+            if tree.jobs:
+                for job in tree.jobs:
+                    if not job.changeMatches(item.change):
+                        continue
+                    build = item.current_build_set.getBuild(job.name)
+                    if build:
+                        if build.result != 'SUCCESS':
+                            allSucceeded = False
+                    else:
+                        allSucceeded = False
+                        # There is no build for the root of this job tree,
+                        # so we should run it.
+                        if mutex.acquire(item, job):
+                            # If this job needs a mutex, either acquire it or
+                            # make sure we have it before running the job.
+                            torun.append(job)
             # If there is no job, this is a null job tree, and we should
             # run all of its jobs.
-            if result == 'SUCCESS' or not job:
+            if allSucceeded:
                 torun.extend(self._findJobsToRun(tree.job_trees, item, mutex))
         return torun
 
@@ -250,27 +252,26 @@ class Pipeline(object):
         elif build.result != 'SUCCESS':
             # Get a JobTree from a Job so we can find only its dependent jobs
             root = self.getJobTree(item.change.project)
-            tree = root.getJobTreeForJob(build.job)
-            for job in tree.getJobs():
-                fakebuild = Build(job, None)
-                fakebuild.result = 'SKIPPED'
-                item.addBuild(fakebuild)
+            dep_jobs = root.getDependentJobs(build.job)
+            self.skipJobs(item, dep_jobs)
 
     def setUnableToMerge(self, item):
         item.current_build_set.unable_to_merge = True
         root = self.getJobTree(item.change.project)
-        for job in root.getJobs():
-            fakebuild = Build(job, None)
-            fakebuild.result = 'SKIPPED'
-            item.addBuild(fakebuild)
+        self.skipJobs(item, root.getJobs())
 
     def setDequeuedNeedingChange(self, item):
         item.dequeued_needing_change = True
         root = self.getJobTree(item.change.project)
-        for job in root.getJobs():
-            fakebuild = Build(job, None)
-            fakebuild.result = 'SKIPPED'
-            item.addBuild(fakebuild)
+        self.skipJobs(item, root.getJobs())
+
+    def skipJobs(self, item, jobs):
+        for job in jobs:
+            # No need to add SKIPPED status for already added jobs
+            if not item.current_build_set.getBuild(job.name):
+                fakebuild = Build(job, None)
+                fakebuild.result = 'SKIPPED'
+                item.addBuild(fakebuild)
 
     def getChangesInQueue(self):
         changes = []
@@ -345,7 +346,7 @@ class ChangeQueue(object):
     def addProject(self, project):
         if project not in self.projects:
             self.projects.append(project)
-            self._jobs |= set(self.pipeline.getJobTree(project).getJobs())
+            self._jobs |= self.pipeline.getJobTree(project).getJobs()
 
             names = [x.name for x in self.projects]
             names.sort()
@@ -485,6 +486,9 @@ class Job(object):
     def __repr__(self):
         return '<Job %s>' % (self.name)
 
+    def __hash__(self):
+        return hash(self.name)
+
     @property
     def is_metajob(self):
         return self.name.startswith('^')
@@ -549,38 +553,40 @@ class Job(object):
 
 
 class JobTree(object):
-    """ A JobTree represents an instance of one Job, and holds JobTrees
-    whose jobs should be run if that Job succeeds.  A root node of a
-    JobTree will have no associated Job. """
+    """ A JobTree represents one node in job dependency tree. Either a
+    single Job or a set of Jobs is associated with one JobTree node.
+    A JobTree holds children JobTrees whose jobs should be run if Jobs
+    associated with current JobTree succeed. In case a set of Jobs is
+    associated with a JobTree node, they all need to finish successfully
+    before the children Jobs are launched. A root node of a JobTree does
+    not have an associated Job.
+    """
 
-    def __init__(self, job):
-        self.job = job
+    def __init__(self, jobs):
+        self.jobs = set(jobs) if jobs else {}
         self.job_trees = []
 
-    def addJob(self, job):
-        if job not in [x.job for x in self.job_trees]:
-            t = JobTree(job)
-            self.job_trees.append(t)
-            return t
-        for tree in self.job_trees:
-            if tree.job == job:
-                return tree
+    def addJob(self, jobs):
+        t = JobTree(jobs)
+        self.job_trees.append(t)
+        return t
 
     def getJobs(self):
-        jobs = []
+        jobs = set()
         for x in self.job_trees:
-            jobs.append(x.job)
-            jobs.extend(x.getJobs())
+            jobs.update(x.jobs)
+            jobs.update(x.getJobs())
         return jobs
 
-    def getJobTreeForJob(self, job):
-        if self.job == job:
-            return self
-        for tree in self.job_trees:
-            ret = tree.getJobTreeForJob(job)
-            if ret:
-                return ret
-        return None
+    def getDependentJobs(self, job):
+        jobs = set()
+        if job in self.jobs:
+            jobs = self.getJobs()
+            jobs.discard(job)
+        else:
+            for x in self.job_trees:
+                jobs.update(x.getDependentJobs(job))
+        return jobs
 
 
 class Build(object):

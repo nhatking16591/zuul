@@ -402,6 +402,12 @@ class Scheduler(threading.Thread):
         return self._getDriver('trigger', connection_name, driver_config)
 
     def _parseConfig(self, config_path, connections):
+
+        def jobset_constructor(loader, node):
+            return frozenset(loader.construct_sequence(node))
+
+        yaml.SafeLoader.add_constructor("!jobset", jobset_constructor)
+
         layout = model.Layout()
         project_templates = {}
 
@@ -411,7 +417,7 @@ class Scheduler(threading.Thread):
                 raise Exception("Unable to read layout config file at %s" %
                                 config_path)
         with open(config_path) as config_file:
-            data = yaml.load(config_file)
+            data = yaml.safe_load(config_file)
 
         validator = layoutvalidator.LayoutValidator()
         validator.validate(data, connections)
@@ -598,14 +604,20 @@ class Scheduler(threading.Thread):
                         add_jobs(job_tree, x)
                 if isinstance(job, dict):
                     for parent, children in job.items():
-                        parent_job = layout.getJob(parent)
-                        parent_tree = job_tree.addJob(parent_job)
-                        if parent_tree is None:
-                            parent_tree = job_tree.getJobTreeForJob(parent_job)
-                        if parent_tree is not None:
-                            add_jobs(parent_tree, children)
+                        if isinstance(parent, str):
+                            parent_tree = job_tree.addJob(
+                                [layout.getJob(parent)])
+                        elif isinstance(parent, frozenset):
+                            parent_tree = job_tree.addJob(
+                                [layout.getJob(x) for x in parent])
+                        else:
+                            raise Exception("Invalid dict key %s in project"
+                                            " definition in layout" % parent)
+                        add_jobs(parent_tree, children)
                 if isinstance(job, str):
-                    job_tree.addJob(layout.getJob(job))
+                    job_tree.addJob([layout.getJob(job)])
+                if isinstance(job, set):
+                    job_tree.addJob([layout.getJob(x) for x in job])
 
         for config_project in data.get('projects', []):
             project = Project(config_project['name'])
@@ -1260,26 +1272,27 @@ class BasePipelineManager(object):
 
         def log_jobs(tree, indent=0):
             istr = '    ' + ' ' * indent
-            if tree.job:
-                efilters = ''
-                for b in tree.job._branches:
-                    efilters += str(b)
-                for f in tree.job._files:
-                    efilters += str(f)
-                if tree.job.skip_if_matcher:
-                    efilters += str(tree.job.skip_if_matcher)
-                if efilters:
-                    efilters = ' ' + efilters
-                tags = []
-                if tree.job.hold_following_changes:
-                    tags.append('[hold]')
-                if not tree.job.voting:
-                    tags.append('[nonvoting]')
-                if tree.job.mutex:
-                    tags.append('[mutex: %s]' % tree.job.mutex)
-                tags = ' '.join(tags)
-                self.log.info("%s%s%s %s" % (istr, repr(tree.job),
-                                             efilters, tags))
+            if tree.jobs:
+                for job in tree.jobs:
+                    efilters = ''
+                    for b in job._branches:
+                        efilters += str(b)
+                    for f in job._files:
+                        efilters += str(f)
+                    if job.skip_if_matcher:
+                        efilters += str(job.skip_if_matcher)
+                    if efilters:
+                        efilters = ' ' + efilters
+                    tags = []
+                    if job.hold_following_changes:
+                        tags.append('[hold]')
+                    if not job.voting:
+                        tags.append('[nonvoting]')
+                    if job.mutex:
+                        tags.append('[mutex: %s]' % job.mutex)
+                    tags = ' '.join(tags)
+                    self.log.info("%s%s%s %s" % (istr, repr(job),
+                                                 efilters, tags))
             for x in tree.job_trees:
                 log_jobs(x, indent + 2)
 
