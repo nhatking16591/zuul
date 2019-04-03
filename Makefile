@@ -46,4 +46,4 @@ check: build.state
 	$(VENV_ACTIVATE) && \
 		pip install --requirement test-requirements.txt
 	$(VENV_ACTIVATE) && \
-        OS_TEST_TIMEOUT=60 python setup.py testr --slowest
+        OS_TEST_TIMEOUT=200 python setup.py testr --slowest
