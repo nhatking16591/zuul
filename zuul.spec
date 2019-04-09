@@ -3,7 +3,7 @@
 Name:             zuul
 Summary:          GoodData customized Zuul gatekeeper
 Epoch:            1
-Version:          2.5.1
+Version:          2.5.2
 Release:          %{?gdcversion}%{?dist}.gdc
 
 Vendor:           GoodData
@@ -53,6 +53,30 @@ GoodData customized Zuul gatekeeper
 %attr(0755, root, root) %{install_dir}/status
 
 %changelog
+* Tue Apr 09 2019 Jan Priessnitz <jan.priessnitz@gooddata.com> 2.5.2-1.gdc
+- SETI-2840: Introduce job sets into pipelines' job trees
+- SETI-2250: Decouple existing "pause" ability from regular exit
+- fix pep8 violations
+- Remove Gerrit integration test
+- SETI-1667: Log skipped jobs before reporting item build result
+- SETI-1335: Add possibility to config keepalive for gearman server
+- SETI-1829: do not create symbolic refs in cloner/merger
+- Bump GitPython dependency
+- SETI-1767: github reporter: report status and labels before merge
+- SETI-1706: Check that SHA of PR head fetched by merger is correct
+- SETI-377: Provide an option for reporting on build abort
+- SETI-377: Handle Github HeadBranchModified error when merging PR
+- SETI-1323: Reduce API calls in getChange
+- SETI-1306: Correct Change, NullChange, Ref equals() functions
+- SETI-1322: remove the github status link on pipeline end
+- SETI-866: Raise timeouts for integration tests
+- SETI-883: Run tox test on py27 instead of py26
+- SETI-381: Fix typo: add_label -> add_labels
+- SETI-1023: Fix job file filtering for post pipeline (push event)
+- SETI-401 Zuul: Kill check pipeline if gate pipeline is started meanwhile
+- SETI-376: Timestamp in release version for testing packages
+- Install test dependencies via tox
+
 * Mon Aug 08 2017 Michal Vanco <michal.vanco@gooddata.com> 2.5.1-2.gdc
 - Gerrit integration test
 - Scheduler logs projects sorted by name
