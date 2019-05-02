@@ -86,7 +86,9 @@ class GithubReporter(BaseReporter):
             self.sched.config.has_option('zuul', 'status_url')):
             url = self.sched.config.get('zuul', 'status_url')
             if self.sched.config.has_option('zuul', 'status_url_with_change'):
-                url = '%s/#%s' % (url, item.change)
+                # format change id into zuul status page filter string
+                filter_string = item.change._id().replace(',', '_')
+                url = '%s/#%s' % (url, filter_string)
         description = ''
         if pipeline.description:
             description = pipeline.description
