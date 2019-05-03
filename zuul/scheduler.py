@@ -445,11 +445,11 @@ class Scheduler(threading.Thread):
             pipeline.failure_message = conf_pipeline.get('failure-message',
                                                          "Build failed.")
             pipeline.merge_failure_message = conf_pipeline.get(
-                'merge-failure-message', "Merge Failed.\n\nThis change or one "
-                "of its cross-repo dependencies was unable to be "
-                "automatically merged with the current state of its "
-                "repository. Please rebase the change and upload a new "
-                "patchset.")
+                'merge-failure-message', "Merge Failed.\n\nZuul merger could "
+                "not merge this change into the base branch. This is most "
+                "likely caused by merge conflicts. Please rebase the change "
+                "and upload the rebased version. In case of further errors, "
+                "contact the zuul administrator.")
             pipeline.success_message = conf_pipeline.get('success-message',
                                                          "Build succeeded.")
             pipeline.footer_message = conf_pipeline.get('footer-message', "")

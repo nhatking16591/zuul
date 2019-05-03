@@ -3552,10 +3552,11 @@ see http://wiki.example.org/Test_Failures",
         self.registerJobs()
 
         self.assertEqual(
-            "Merge Failed.\n\nThis change or one of its cross-repo "
-            "dependencies was unable to be automatically merged with the "
-            "current state of its repository. Please rebase the change and "
-            "upload a new patchset.",
+            "Merge Failed.\n\nZuul merger could "
+            "not merge this change into the base branch. This is most "
+            "likely caused by merge conflicts. Please rebase the change "
+            "and upload the rebased version. In case of further errors, "
+            "contact the zuul administrator.",
             self.sched.layout.pipelines['check'].merge_failure_message)
         self.assertEqual(
             "The merge failed! For more information...",
@@ -3644,7 +3645,6 @@ see http://wiki.example.org/Test_Failures",
         self.assertEqual(B.data['status'], 'NEW')
         self.assertIn('Build succeeded', A.messages[1])
         self.assertIn('Merge Failed', B.messages[1])
-        self.assertIn('automatically merged', B.messages[1])
         self.assertNotIn('logs.example.com', B.messages[1])
         self.assertNotIn('SKIPPED', B.messages[1])
 
