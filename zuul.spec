@@ -51,6 +51,7 @@ GoodData customized Zuul gatekeeper
 %attr(0755, root, root) %{install_dir}/lib
 %attr(0755, root, root) %{install_dir}/lib64
 %attr(0755, root, root) %{install_dir}/status
+%attr(0755, root, root) %{install_dir}/share
 
 %changelog
 * Tue Apr 09 2019 Jan Priessnitz <jan.priessnitz@gooddata.com> 2.5.2-1.gdc
