@@ -33,6 +33,7 @@ make build
 %install
 rm -fr $RPM_BUILD_ROOT
 make DESTDIR=$RPM_BUILD_ROOT%{install_dir} install
+cp -r tools %{buildroot}%{install_dir}/
 
 %check
 export PBR_VERSION="%{version}.%{release}"
@@ -52,8 +53,12 @@ GoodData customized Zuul gatekeeper
 %attr(0755, root, root) %{install_dir}/lib64
 %attr(0755, root, root) %{install_dir}/status
 %attr(0755, root, root) %{install_dir}/share
+%attr(0755, root, root) %{install_dir}/tools
 
 %changelog
+* Wed Jul 10 2019 King Nguyen <king.nguyen@gooddata.com> - 2.5.2
+- SETI-1989 Add tools folder to package
+
 * Tue Apr 09 2019 Jan Priessnitz <jan.priessnitz@gooddata.com> 2.5.2-1.gdc
 - SETI-2840: Introduce job sets into pipelines' job trees
 - SETI-2250: Decouple existing "pause" ability from regular exit
